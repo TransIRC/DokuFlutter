@@ -47,7 +47,7 @@ Add your screenshots here, e.g.
 1. **Clone the Repo**
 
    ```sh
-   git clone https://github.com/yourusername/transirc-wiki-app.git
+   git clone https://github.com/TransIRC/DokuFlutter.git
    cd transirc-wiki-app
    ```
 
