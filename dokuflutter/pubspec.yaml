@@ -1,0 +1,30 @@
+name: dokuflutter
+description: A DokuWiki offline reader for Flutter.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  connectivity_plus: ^5.0.2
+  xml_rpc: ^0.5.1
+  flutter_markdown: ^0.6.23
+  printing: ^5.12.0
+  pdf: ^3.10.7
+  share_plus: ^8.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoEmoji-Regular.ttf
