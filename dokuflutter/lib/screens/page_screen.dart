@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart'; // Add this import for PdfColor
+import 'package:pdf/pdf.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../services/wiki_service.dart';
 import '../services/sync_service.dart';
@@ -46,7 +46,6 @@ class _PageScreenState extends State<PageScreen> {
     _lastSync = SyncService().lastSync;
   }
 
-  // Load both text and emoji fonts for PDF export
   Future<void> _loadPdfFonts() async {
     final regularFontData = await rootBundle.load("assets/fonts/NotoSans-Regular.ttf");
     final emojiFontData = await rootBundle.load("assets/fonts/NotoEmoji-Regular.ttf");
@@ -87,7 +86,6 @@ class _PageScreenState extends State<PageScreen> {
         return await WikiService().getPage(pageId);
       } catch (_) {}
     }
-    // fallback to cache
     final cached = SyncService().getCachedPage(pageId);
     if (cached != null) return cached;
     throw Exception('Page not available offline.');
@@ -107,23 +105,23 @@ class _PageScreenState extends State<PageScreen> {
     );
   }
 
-  // --- SHARE AS PDF FEATURE START ---
-  Future<void> _shareCurrentPage() async {
+  // Share the entire section as PDF (no popup)
+  Future<void> _shareSectionDirect() async {
     await _fontLoader;
-    final pageText = await _getPage(widget.pageId);
-    final pdf = await _generatePdf(widget.pageId, pageText);
-    await Printing.sharePdf(bytes: await pdf.save(), filename: "${widget.pageId.replaceAll(':', '_')}.pdf");
-  }
 
-  Future<void> _shareSection(String namespace) async {
-    await _fontLoader;
+    // Determine the section namespace
+    String namespace;
+    if (widget.pageId.contains(':')) {
+      namespace = widget.pageId.substring(0, widget.pageId.lastIndexOf(':') + 1);
+    } else {
+      namespace = 'start';
+    }
+
     final allPages = await WikiService().getAllPages();
-    // Only include pages in this namespace
     final sectionPages = allPages
         .where((p) => p['id'].toString().startsWith(namespace))
         .toList();
 
-    // Make sure start page is first if it exists
     String startId = namespace.endsWith(':') ? '${namespace}start' : '$namespace:start';
     final startPage = sectionPages.where((p) => p['id'] == startId).toList();
     final otherPages = sectionPages.where((p) => p['id'] != startId).toList();
@@ -134,7 +132,10 @@ class _PageScreenState extends State<PageScreen> {
     ];
 
     final pdf = await _generateSectionPdf(namespace, orderedPages);
-    await Printing.sharePdf(bytes: await pdf.save(), filename: "${namespace.replaceAll(':', '_')}.pdf");
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: "${namespace.replaceAll(':', '_')}.pdf",
+    );
   }
 
   Future<pw.Document> _generatePdf(String pageId, String content) async {
@@ -176,7 +177,6 @@ class _PageScreenState extends State<PageScreen> {
     final emojiFont = _pdfFonts![1];
     final pdf = pw.Document();
 
-    // Collect IDs for anchor lookup
     final pageIds = sectionPages.map((p) => p['id'] as String).toList();
 
     for (final p in sectionPages) {
@@ -216,7 +216,6 @@ class _PageScreenState extends State<PageScreen> {
     return pdf;
   }
 
-  // Internal link support in markdown
   List<pw.Widget> _markdownToPdfWidgetsWithLinks(
       String markdown, pw.Font regularFont, pw.Font emojiFont, List<String> pageIds) {
     final wikiLink = RegExp(r'\[([^\]]+)\]\(([^)]+)\)');
@@ -227,7 +226,6 @@ class _PageScreenState extends State<PageScreen> {
         List<pw.Widget> row = [];
         int lastEnd = 0;
         for (final match in wikiLink.allMatches(line)) {
-          // Any text before the link
           if (match.start > lastEnd) {
             row.add(pw.Text(
               line.substring(lastEnd, match.start),
@@ -243,7 +241,7 @@ class _PageScreenState extends State<PageScreen> {
                 child: pw.Text(
                   text,
                   style: pw.TextStyle(
-                    color: PdfColor.fromInt(0xff1976d2), // Material blue 700
+                    color: PdfColor.fromInt(0xff1976d2),
                     decoration: pw.TextDecoration.underline,
                     font: regularFont,
                     fontFallback: [emojiFont],
@@ -261,7 +259,6 @@ class _PageScreenState extends State<PageScreen> {
           }
           lastEnd = match.end;
         }
-        // Any trailing text after the last link
         if (lastEnd < line.length) {
           row.add(pw.Text(
             line.substring(lastEnd),
@@ -302,7 +299,6 @@ class _PageScreenState extends State<PageScreen> {
     }
     return widgets;
   }
-  // --- SHARE AS PDF FEATURE END ---
 
   @override
   Widget build(BuildContext context) {
@@ -311,22 +307,9 @@ class _PageScreenState extends State<PageScreen> {
         title: Text(widget.pageId.replaceAll('_', ' ')),
         actions: [
           IconButton(
-            tooltip: 'Share this page as PDF',
-            icon: const Icon(Icons.share),
-            onPressed: _shareCurrentPage,
-          ),
-          PopupMenuButton<String>(
             tooltip: 'Share section as PDF',
             icon: const Icon(Icons.picture_as_pdf),
-            onSelected: (section) {
-              _shareSection(section);
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: widget.pageId.contains(':') ? widget.pageId.split(':').first + ':' : 'start',
-                child: const Text('Share whole section'),
-              ),
-            ],
+            onPressed: _shareSectionDirect,
           ),
         ],
       ),
@@ -342,7 +325,9 @@ class _PageScreenState extends State<PageScreen> {
               return WikiSidebar(
                 text: snapshot.data!,
                 onTapLink: _openPage,
-                onShareSection: _shareSection,
+                onShareSection: (section) {
+                  _shareSectionDirect();
+                },
                 onToggleTheme: widget.onToggleTheme,
                 themeMode: widget.themeMode,
               );
@@ -358,7 +343,7 @@ class _PageScreenState extends State<PageScreen> {
               color: Colors.yellow[100],
               padding: const EdgeInsets.all(8),
               child: const Text(
-                "Copying the wiki to your phone. Pages will appear as they're synced...",
+                "Downloading WiKi Contents...",
                 textAlign: TextAlign.center,
               ),
             ),

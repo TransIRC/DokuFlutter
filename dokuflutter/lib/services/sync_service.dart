@@ -21,13 +21,18 @@ class SyncService {
     return result != ConnectivityResult.none;
   }
 
+  /// Syncs all pages, but only updates if the fetched content is different from what's already cached.
   Future<void> syncAllPages() async {
     final pages = await WikiService().getAllPages();
     DateTime now = DateTime.now();
 
     for (final page in pages) {
-      final content = await WikiService().getPage(page['id']);
-      await _pagesBox.put(page['id'], content);
+      final id = page['id'];
+      final fetchedContent = await WikiService().getPage(id);
+      final cachedContent = _pagesBox.get(id) as String?;
+      if (cachedContent != fetchedContent) {
+        await _pagesBox.put(id, fetchedContent);
+      }
     }
     await _metaBox.put('lastSync', now.toIso8601String());
   }
